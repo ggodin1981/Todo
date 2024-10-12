@@ -87,95 +87,74 @@ For this in-memory example, no additional thread safety measures are needed sinc
    
 ```
 TodoApi/
+├── Properties/
+│   └──launchSettings.json
 ├── Controllers/
 │   └── TodoController.cs
 ├── Data/
 │   └── TodoContext.cs
 ├── Models/
 │   └── TodoItem.cs
-├── Services/
+├── Interface/
 │   └── ITodoService.cs
+├── Services/│   
 │   └── TodoService.cs
 ├── Program.cs
 
 ```
 Now, let’s introduce a service layer for better separation of concerns. The service will handle business logic, and the controller will focus on routing.
 
-ITodoService.cs **(Interface for the service)**
 
+**Properties**
 
-```csharp
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using TodoApi.Models;
-namespace TodoApi.Services
+**launchSettings**
+
+```json
 {
-    public interface ITodoService
-    {
-        Task<List<TodoItem>> GetTodos();
-        Task<TodoItem> GetTodoById(int id);
-        Task<TodoItem> AddTodo(TodoItem item);
-        Task UpdateTodo(TodoItem item);
-        Task DeleteTodoById(int id);
-        bool TodoItemExists(int id);
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:57828",
+      "sslPort": 44389
     }
+  },
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "applicationUrl": "http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "applicationUrl": "https://localhost:5000;http://localhost:7180",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
 }
 ```
 
-TodoService.cs **(Implementation)**
 
-```csharp
-using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using TodoApi.Data;
-using TodoApi.Models;
 
-namespace TodoApi.Services
-{
-    public class TodoService : ITodoService
-    {
-        private readonly TodoContext _context;
-        public TodoService(TodoContext context)
-        {
-            _context = context;
-        }
-        public async Task<List<TodoItem>> GetTodos()
-        {
-            return await _context.TodoItems.ToListAsync();
-        }
-        public async Task<TodoItem> GetTodoById(int id)
-        {
-            return await _context.TodoItems.FindAsync(id);
-        }
-        public async Task<TodoItem> AddTodo(TodoItem item)
-        {
-            _context.TodoItems.Add(item);
-            await _context.SaveChangesAsync();
-            return item;
-        }
-        public async Task UpdateTodo(TodoItem item)
-        {
-            _context.Entry(item).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-        }
-        public async Task DeleteTodoById(int id)
-        {
-            var todoItem = await _context.TodoItems.FindAsync(id);
-            if (todoItem != null)
-            {
-                _context.TodoItems.Remove(todoItem);
-                await _context.SaveChangesAsync();
-            }
-        }
-        public bool TodoItemExists(int id)
-        {
-            return _context.TodoItems.Any(e => e.Id == id);
-        }
-    }
-}
-```
 **TodoController.cs**
  - Now, the controller becomes a simple bridge to the service:
 
@@ -235,6 +214,193 @@ public class TodoController : ControllerBase
     }
 }
 ```
+
+**Data**
+```csharp
+using Microsoft.EntityFrameworkCore;
+using TodoApi.Models;
+namespace TodoApi.Data
+{
+    public class TodoContext : DbContext
+    {
+        public TodoContext(DbContextOptions<TodoContext> options) : base(options)
+        {
+        }
+        public DbSet<TodoItem> TodoItems { get; set; }
+    }
+}
+```
+
+
+ITodoService.cs **(Interface for the service)**
+
+```csharp
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using TodoApi.Models;
+
+namespace TodoApi.Services
+{
+    public interface ITodoService
+    {
+        Task<List<TodoItem>> GetTodos();
+        Task<TodoItem> GetTodoById(int id);
+        Task<TodoItem> AddTodo(TodoItem item);
+        Task<TodoItem> UpdateTodo(TodoDto item);      
+        Task DeleteTodoById(int id);
+        bool TodoItemExists(int id);
+    }
+}
+```
+
+
+TodoItem.cs **Model**
+
+```
+using System.ComponentModel.DataAnnotations;
+namespace TodoApi.Models
+{
+    public class TodoItem
+    {
+        public int Id { get; set; } = 0;
+
+        [Required(ErrorMessage = "Title is required.")]
+        [StringLength(100, ErrorMessage = "Title length cannot exceed 100 characters.")]
+        public string Title { get; set; }
+
+        public bool IsCompleted { get; set; } = false;
+    }
+    public class TodoDto
+    {
+        public int Id { get; set; } = 0;        
+
+        public bool IsCompleted { get; set; } = false;
+    }
+}
+```
+
+
+
+TodoService.cs **(Services)**
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using TodoApi.Data;
+using TodoApi.Models;
+namespace TodoApi.Services
+{
+    public class TodoService : ITodoService
+    {
+        private readonly TodoContext _context;
+        public TodoService(TodoContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<List<TodoItem>> GetTodos()
+        {
+            return await _context.TodoItems.ToListAsync();
+        }
+
+        public async Task<TodoItem> GetTodoById(int id)
+        {
+            return await _context.TodoItems.FindAsync(id);
+        }
+
+        public async Task<TodoItem> AddTodo(TodoItem item)
+        {
+            _context.TodoItems.Add(item);
+            await _context.SaveChangesAsync();
+            return item;
+        }
+
+        public async Task<TodoItem> UpdateTodo(TodoDto item)
+        {
+            var existingTodo = await _context.TodoItems.FindAsync(item.Id);
+            if (existingTodo != null)
+            {
+                existingTodo.IsCompleted = !existingTodo.IsCompleted;
+                await _context.SaveChangesAsync();
+            }
+            return existingTodo;
+        }        
+
+        public async Task DeleteTodoById(int id)
+        {
+            var todoItem = await _context.TodoItems.FindAsync(id);             
+            if (todoItem != null)
+            {
+                _context.TodoItems.Remove(todoItem);
+                await _context.SaveChangesAsync();
+            }
+        }
+        public bool TodoItemExists(int id)
+        {
+            return _context.TodoItems.Any(e => e.Id == id);
+        }
+    }
+}
+```
+
+
+**appsettings.json**
+```
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+**Program.cs**
+
+```
+using Microsoft.EntityFrameworkCore;
+using TodoApi.Data;
+using TodoApi.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddControllers();
+builder.Services.AddScoped<ITodoService, TodoService>();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+// Register the In-Memory database
+builder.Services.AddDbContext<TodoContext>(opt => opt.UseInMemoryDatabase("TodoList"));
+// Enable CORS to allow requests from the frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
+var app = builder.Build();
+// Configure the HTTP request pipeline.
+app.UseCors("AllowAll");
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+app.Run();
+```
+
 4. **Performance: Optimizing API Calls and Rendering**
    - To improve performance in both backend and frontend:
      
@@ -267,6 +433,11 @@ public class TodoController : ControllerBase
 
 **Performance:**
  - Async calls and caching will improve API response times and reduce load.
+
+
+## **Front End React**
+
+
 
 
 
