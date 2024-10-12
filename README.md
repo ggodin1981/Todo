@@ -481,14 +481,18 @@ cd ReactTodo
 2. **Edit the package.json**
 
 ```
-{
-  "name": "todo-app",
-  "version": "1.0.0",
+ {
+  "name": "todolist-app",
+  "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "react-scripts": "5.0.0"
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-scripts": "5.0.1",
+    "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -515,6 +519,7 @@ cd ReactTodo
     ]
   }
 }
+
 ```
 
 3. **Create the Components and Services**
@@ -524,58 +529,140 @@ cd ReactTodo
    - This file is the entry point of the React app, rendering the App component to the DOM.
   
 ```
-import React from 'react';
+ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// React 18 version with createRoot
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
 
 ```
 
 **src/App.js**
 
 - The App.js file is the main component of your application, responsible for fetching todos from the API and rendering the TodoList component.
+  
+**Security:**
+  - Sanitize and Validate All User Inputs
 
 ```
-import React, { useState, useEffect } from 'react';
-import TodoList from './components/TodoList';
-import todoService from './services/todoService';
+ import React, { useState, useEffect } from 'react';
+import { getTodos as fetchTodos, createTodo, toggleTodo, deleteTodo } from './services/todoService'; // Import API functions from your service
 
-function App() {
+const App = () => {
+    // Define state for todos
     const [todos, setTodos] = useState([]);
+    
+    // Define state for input title
     const [title, setTitle] = useState('');
+    
+    // Define state for errors
+    const [error, setError] = useState(null);
 
+    // Use useEffect to fetch todos on component mount
     useEffect(() => {
-        fetchTodos();
+        fetchTodosFromService();
     }, []);
 
-    function fetchTodos() {
-        todoService.getTodos().then(setTodos);
-    }
+    const sanitizeInput = (input) => {
+        const sanitizedInput = input.replace(/<\/?[^>]+(>|$)/g, ""); // Remove HTML tags
+        return sanitizedInput.trim(); // Remove extra spaces
+    };
 
-    function addTodo() {
-        todoService.createTodo(title).then(() => {
-            fetchTodos();
-            setTitle('');
-        });
-    }
+    const validateInput = (input) => {
+        if (input.length === 0) {
+            setError("Todo title cannot be empty.");
+            return false;
+        }
+        if (input.length > 100) { // Example: limit length to 100 characters
+            setError("Todo title cannot be longer than 100 characters.");
+            return false;
+        }
+        return true;
+    };
+
+    // Function to fetch todos from the service
+    const fetchTodosFromService = async () => {
+        try {
+            const todosData = await fetchTodos(); // Call the service
+            setTodos(todosData); // Update state with fetched todos
+        } catch (err) {
+            setError(err.message); // Set error state
+        }
+    };
+
+    // Function to handle creating a new todo
+    const addTodo = async () => {
+        if (title.trim()) { // Check if title is not empty
+            try {
+                const sanitizedTitle = sanitizeInput(title); // Sanitize the input
+                if (!validateInput(sanitizedTitle)) {
+                    return; // Stop if validation fails
+                }                
+                await createTodo(sanitizedTitle); // Call service to create a new todo
+                setTitle(''); // Clear input field
+                fetchTodosFromService(); // Refresh todos
+            } catch (err) {
+                setError(err.message); // Handle error
+            }
+        }
+        else{
+            setError('title is required'); // Handle error
+        }
+    };     
+    const deletetodo = async (id) => {
+        try {
+            await deleteTodo(id); 
+            setTitle(''); // Clear input field
+            fetchTodosFromService(); // Refresh todos
+        } catch (err) {
+            setError(err.message); // Handle error
+        }
+    };
+    const toggletodo = async (id,isCompleted) => {
+        try {
+            await toggleTodo(id,isCompleted);            
+            fetchTodosFromService(); // Refresh todos
+        } catch (err) {
+            setError(err.message); // Handle error
+        }
+    };
 
     return (
-        <div>
+            <div>
             <h1>Todo List</h1>
-            <input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="Add a new task"
+            {error && <p style={{ color: 'red' }}>{error}</p>}
+            <input type="text" value={title} maxlength="50" onChange={(e) => {setError(null); // Clear error on new input
+                    setTitle(e.target.value);}}
+                placeholder="Add a new todo"
             />
             <button onClick={addTodo}>Add</button>
-            <TodoList todos={todos} fetchTodos={fetchTodos} />
+            <ul>
+                {todos.map(todo => (
+                    <li key={todo.id}>
+                        <span
+                            style={{
+                                textDecoration: todo.isCompleted ? 'line-through' : 'none'
+                            }}
+                        >
+                            {todo.title}
+                        </span>
+                        <button onClick={() => toggletodo(todo.id,todo.isCompleted)}>Toggle</button>
+                        <button onClick={() => deletetodo(todo.id)}>Delete</button>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
-}
+};
+
 export default App;
+
 ```
 
 **src/components/TodoList.js**
@@ -595,7 +682,9 @@ function TodoList({ todos, fetchTodos }) {
         </ul>
     );
 }
+
 export default TodoList;
+
 ```
 
 **src/components/TodoItem.js**
@@ -603,7 +692,7 @@ export default TodoList;
 - The TodoItem.js file represents each individual todo item in the list. It provides buttons to toggle and delete the todo.
 
 ```
-import React from 'react';
+ import React from 'react';
 import todoService from '../services/todoService';
 
 function TodoItem({ todo, fetchTodos }) {
@@ -629,7 +718,9 @@ function TodoItem({ todo, fetchTodos }) {
         </li>
     );
 }
+
 export default TodoItem;
+
 ```
 
 **src/services/todoService.js**
@@ -637,32 +728,72 @@ export default TodoItem;
 - This service handles all the API calls to your ASP.NET Core Web API. It communicates with the backend to get, create, update, and delete todos.
   
 ```
-const API_URL = 'http://localhost:5000/api/todo';
+ const API_URL = 'https://localhost:5000/api/todo';
 
-async function getTodos() {
-    const response = await fetch(API_URL);
-    return response.json();
+// Fetch todos from the API
+export async function getTodos() {
+    try {
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+            throw new Error('Failed to fetch todos');
+        }
+        return await response.json();
+    } catch (error) {
+        throw error; // Throw the error to be handled in the component
+    }
 }
 
-async function createTodo(title) {
-    await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title }),
-    });
+// Create a new todo
+export async function createTodo(title) {
+    if (!title.trim()) return; // Prevent empty todos
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ title }),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to add todo');
+        }
+    } catch (error) {
+        throw error; // Throw the error to be handled in the component
+    }
 }
 
-async function toggleTodo(id) {
-    await fetch(`${API_URL}/${id}`, { method: 'PUT' });
+// Toggle a todo's completion status
+export async function toggleTodo(id, isCompleted) {
+    try {
+        const response = await fetch(`${API_URL}/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                id:id,
+                isCompleted: !isCompleted
+            }),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update todo');
+        }
+    } catch (error) {
+        throw error; // Throw the error to be handled in the component
+    }
 }
 
-async function deleteTodo(id) {
-    await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+// Delete a todo
+export async function deleteTodo(id) {
+    try {
+        const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        if (!response.ok) {
+            throw new Error('Failed to delete todo');
+        }        
+    } catch (error) {
+        throw error; // Throw the error to be handled in the component
+    }
 }
-
-export default { getTodos, createTodo, toggleTodo, deleteTodo };
 
 ```
 
@@ -671,17 +802,31 @@ export default { getTodos, createTodo, toggleTodo, deleteTodo };
    - Your public/index.html is the template where the React app will be injected. You can customize it, but here's a simple version:
   
 ```
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />    
     <title>Todo App</title>
-</head>
-<body>
-    <div id="root"></div>
-</body>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>    
+  </body>
 </html>
+
 
 ```
 
@@ -689,19 +834,29 @@ export default { getTodos, createTodo, toggleTodo, deleteTodo };
    - To prevent unwanted files from being pushed to version control, here is a basic .gitignore:
 
 ```
-# Logs
-logs
-*.log
+ # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Dependency directories
-node_modules
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
 
-# Production build files
-build
+# testing
+/coverage
 
-# Misc
+# production
+/build
+
+# misc
 .DS_Store
-.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 ```
 
