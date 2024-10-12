@@ -256,7 +256,7 @@ namespace TodoApi.Services
 
 TodoItem.cs **Model**
 
-```
+```csharp
 using System.ComponentModel.DataAnnotations;
 namespace TodoApi.Models
 {
@@ -348,7 +348,8 @@ namespace TodoApi.Services
 
 
 **appsettings.json**
-```
+
+```json
 {
   "Logging": {
     "LogLevel": {
@@ -362,7 +363,7 @@ namespace TodoApi.Services
 
 **Program.cs**
 
-```
+```csharp
 using Microsoft.EntityFrameworkCore;
 using TodoApi.Data;
 using TodoApi.Services;
@@ -480,7 +481,7 @@ cd ReactTodo
 
 2. **Edit the package.json**
 
-```
+```json
  {
   "name": "todolist-app",
   "version": "0.1.0",
@@ -528,7 +529,7 @@ cd ReactTodo
      src/index.js
    - This file is the entry point of the React app, rendering the App component to the DOM.
   
-```
+```javascript
  import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -550,7 +551,7 @@ root.render(
 **Security:**
   - Sanitize and Validate All User Inputs
 
-```
+```javascript
  import React, { useState, useEffect } from 'react';
 import { getTodos as fetchTodos, createTodo, toggleTodo, deleteTodo } from './services/todoService'; // Import API functions from your service
 
@@ -669,7 +670,7 @@ export default App;
 
 - This component is responsible for rendering the list of todos. It renders each todo item using the TodoItem component.
 
-```
+```javascript
 import React from 'react';
 import TodoItem from './TodoItem';
 
@@ -691,7 +692,7 @@ export default TodoList;
 
 - The TodoItem.js file represents each individual todo item in the list. It provides buttons to toggle and delete the todo.
 
-```
+```javascript
  import React from 'react';
 import todoService from '../services/todoService';
 
@@ -727,7 +728,7 @@ export default TodoItem;
 
 - This service handles all the API calls to your ASP.NET Core Web API. It communicates with the backend to get, create, update, and delete todos.
   
-```
+```javascript
  const API_URL = 'https://localhost:5000/api/todo';
 
 // Fetch todos from the API
@@ -801,7 +802,7 @@ export async function deleteTodo(id) {
 
    - Your public/index.html is the template where the React app will be injected. You can customize it, but here's a simple version:
   
-```
+```html
  <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -833,7 +834,7 @@ export async function deleteTodo(id) {
 5. **Configure .gitignore**
    - To prevent unwanted files from being pushed to version control, here is a basic .gitignore:
 
-```
+```md
  # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -917,7 +918,7 @@ Now your **React frontend** is ready to interact with the **ASP.NET Core Web API
 
 
  
-
+If you need further adjustments or assistance, feel free to ask!
 
 
 
